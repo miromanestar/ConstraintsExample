@@ -16,7 +16,7 @@ var constraints = (() => {
 
     const set = (v, val) => {
         v.value = val
-        for (dep of deps) {
+        for (let dep of v.deps) {
             if (dep.valid)
                 invalidate(dep)
         }
@@ -24,7 +24,7 @@ var constraints = (() => {
 
     const invalidate = v => {
         v.valid = false
-        for (dep of deps) {
+        for (let dep of v.deps) {
             if (dep.valid)
                 invalidate(dep)
         }
@@ -33,14 +33,14 @@ var constraints = (() => {
     }
 
     const create = () => {
-        const v = {
+        return {
             value: null,
-            eval: () => {},
             valid: false,
             deps: [],
+            calc: () => {
+                console.log('Undefined calc function')
+            }
         }
-
-        return v
     }
 
     return {
