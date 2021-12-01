@@ -18,7 +18,7 @@ main {
     height: 100%;
     width: 100%;
     position: absolute;
-    z-index: 0;
+    z-index: -1;
 }
 
 .box {
@@ -28,6 +28,12 @@ main {
     background-color: red;
     cursor: grab;
     z-index: 1;
+    transition: outline .2s;
+    outline: 1px solid transparent;
+}
+
+.box.selected {
+    outline: 4px solid black;
 }
 
 .explanation {

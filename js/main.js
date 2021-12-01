@@ -6,7 +6,7 @@ var example = (() => {
     area.onmousedown = e => {
         const c = getCoords(e)
 
-        if (e.which === 1)
+        if (e.button === 0)
             createBox(c.x, c.y)
     }
 
@@ -14,21 +14,10 @@ var example = (() => {
         e.preventDefault()
     }
 
-    area.ondragover = e => {
-        e.preventDefault()
-    }
-
-    area.ondrop = e => {
-        e.preventDefault()
-
-        const c = getCoords(e)
-        let box = document.getElementById(e.dataTransfer.getData('id'))
-        box.style.left = c.x
-        box.style.top = c.y
-    }
-
     window.onkeydown = e => {
-        console.log(e)
+        switch (e.key) {
+            case 'Backspace': clearSelection(); break;
+        }
     }
 
     const createBox = (x, y) => {
@@ -42,6 +31,14 @@ var example = (() => {
         box.style.left = x
         box.style.top = y
         area.appendChild(box)
+
+        const draggable = new PlainDraggable(box, { onMove: () => {
+            for (let li of lines) {
+                if (box === li.start || box === li.end) {
+                    li.position()
+                }
+            }
+        } })
         
         variables[key] = con.create()
 
@@ -63,44 +60,65 @@ var example = (() => {
             console.log('test')
         }
 
-        box.ondragstart = e => {
-            e.dataTransfer.setData('id', e.target.id)
-        }
-
         box.onkeydown = e => {
             e.stopPropagation()
             switch (e.key) {
-                case 'x': area.removeChild(e.target); break;
-                case 'f': createLine(e); break;
+                case 'x': deleteBox(e); break;
+                case 'f': drawLine(e); break;
             }
         }
     }
 
-    let tempLine = []
-    const createLine = e => {
-        tempLine.push(e.target)
-        
-        if (tempLine.length === 2) {
-            const x1 = tempLine[0].style.left.replace('px', '')
-            const y1 = tempLine[0].style.top.replace('px', '')
-            const x2 = tempLine[1].style.left.replace('px', '')
-            const y2 = tempLine[1].style.top.replace('px', '')
-
-            const dist = Math.sqrt( Math.pow((x1 - x2), 2) + Math.pow((y1 - y2), 2) )
-            let line = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
-            line.setAttributeNS('http://www.w3.org/2000/svg', 'viewBox', '0 0 100 100')
-            line.innerHTML = `
-                <defs>
-                    <marker id="head" orient="auto" markerWidth="10" markerHeight="10" refX="0.1" refY="0.2">
-                        <path d="M0, 0 V4 L2, 2 Z" fill="black" />
-                    </marker>
-                </defs>
-                <line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="black" stroke-width="2" marker-end="url(#head)" />
-            `
-
-            area.appendChild(line)
-            tempLine = []
+    const deleteBox = e => {
+        const removeLine = li => {
+            li.remove()
+            lines = lines.filter(el => { return el !== li })
         }
+
+        for (let li of lines) {
+            if (e.target === li.start || e.target === li.end) {
+                if (e.target === li.end) {
+                    li.hide()
+                    setTimeout(() => removeLine(li), 500)
+                } else {
+                    removeLine(li)
+                }
+
+            }
+        }
+
+        area.removeChild(e.target)
+    }
+
+    let lines = []
+    let line = []
+    const drawLine = e => {
+        if (line[0] && line[0] === e.target) {
+            clearSelection()
+            return
+        }
+
+        line.push(e.target)
+        e.target.classList.add('selected')
+
+        if (line.length === 2) {
+            const temp = new LeaderLine(line[0], line[1], { hide: true })
+            temp['show']('draw')
+            temp.show()
+            lines.push(temp)
+            
+            setTimeout(clearSelection, 500)
+        }
+    }
+
+    const clearSelection = () => {
+        for (let el of line) {
+            if (el.classList.contains('selected')) {
+                el.classList.remove('selected')
+            }
+        }
+
+        line = []
     }
 
     const getCoords = e => {
