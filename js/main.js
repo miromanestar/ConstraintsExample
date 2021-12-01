@@ -5,7 +5,13 @@ var example = (() => {
 
     area.onmousedown = e => {
         const c = getCoords(e)
-        createBox(c.x, c.y)
+
+        if (e.which === 1)
+            createBox(c.x, c.y)
+    }
+
+    area.oncontextmenu = e => {
+        e.preventDefault()
     }
 
     area.ondragover = e => {
@@ -21,6 +27,10 @@ var example = (() => {
         box.style.top = c.y
     }
 
+    window.onkeydown = e => {
+        console.log(e)
+    }
+
     const createBox = (x, y) => {
         const key = Date.now()
 
@@ -34,7 +44,6 @@ var example = (() => {
         area.appendChild(box)
         
         variables[key] = con.create()
-        console.log(variables)
 
         box.onmousedown = e => {
             e.stopPropagation()
@@ -44,11 +53,22 @@ var example = (() => {
             e.target.focus()
         }
 
+        box.onmouseleave = e => {
+            e.target.blur()
+        }
+
+        box.oncontextmenu = e => {
+            e.preventDefault()
+            e.stopPropagation()
+            console.log('test')
+        }
+
         box.ondragstart = e => {
             e.dataTransfer.setData('id', e.target.id)
         }
 
         box.onkeydown = e => {
+            e.stopPropagation()
             switch (e.key) {
                 case 'x': area.removeChild(e.target); break;
                 case 'f': createLine(e); break;

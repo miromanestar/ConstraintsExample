@@ -37,8 +37,8 @@ var constraints = (() => {
             value: null,
             valid: false,
             deps: [],
-            calc: () => {
-                console.log('Undefined calc function')
+            eval: () => {
+                return null
             }
         }
     }
