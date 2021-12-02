@@ -1,4 +1,3 @@
-
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
 <meta name="HandheldFriendly" content="true">
@@ -8,20 +7,24 @@
     <meta name="description" content="An example of dataflow constraints" />
     <link rel="icon" type="image/png" href="favicon.png" />
 
-    <link rel="stylesheet" type="text/css" href="css/main.css" />
+    <link rel="stylesheet" type="text/css" href="css/index.css" />
 </head>
 
 <body>
     <main>
         <div id="constraints-area"></div>
         <div class="explanation">
-            <p>Click anywhere to insert a box</p>
-            <p>Press X to delete the selected box</p>
+            <div class="content">
+                <p>Click anywhere to insert a box</p>
+                <p>Hover over a box and press X to delete it</p>
+                <p>Press F on a box to select/unselect it; a line will be drawn between two selections</p>
+                <p>Press backspace to deselect all</p>
+            </div>
         </div>
     </main>
 
     <script src="js/constraints.js"></script>
     <script src="js/plain-draggable.min.js" async></script>
     <script src="js/leader-line.min.js" async></script>
-    <script src="js/main.js"></script>
+    <script src="js/index.js"></script>
 </body>
