@@ -38,7 +38,7 @@ var constraints = (() => {
             valid: false,
             deps: [],
             eval: () => {
-                return null
+                return value
             }
         }
     }

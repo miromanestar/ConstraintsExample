@@ -19,13 +19,17 @@ var example = (() => {
     window.onkeydown = e => {
         switch (e.key) {
             case 'Backspace': clearSelection(); break;
+            case 'a': console.log(variables)
         }
     }
 
     const createBox = (x, y) => {
+        const key = Date.now()
+
         let box = document.createElement('div')
         box.classList.add('box');
         box.setAttribute('tabindex', '0')
+        box.setAttribute('key', key)
         area.appendChild(box)
         box.style.left = x - box.offsetWidth / 2
         box.style.top = y - box.offsetHeight / 2
@@ -38,7 +42,7 @@ var example = (() => {
             }
         }})
 
-        variables[Date.now()] = con.create()
+        variables[key] = con.create()
         
         box.onmouseover = e => {
             e.target.focus()
@@ -54,9 +58,14 @@ var example = (() => {
             
             let oldVal = box.innerHTML
             if (box.lastChild && box.lastChild.nodeName === 'INPUT') {
-                if (verifyInput(box.lastChild.value)) {
+                const verify = verifyInput(box.lastChild.value)
+                if (verify[0]) {
                     box.classList.remove('active')
                     box.innerHTML = box.lastChild.value
+                    setFunction(verify[0], verify[1], input.value)
+                } else {
+                    box.classList.add('shake')
+                    setTimeout(() => { box.classList.remove('shake')}, 500)
                 }
 
                 return
@@ -73,10 +82,16 @@ var example = (() => {
                 e.stopPropagation()
                 
                 if (e.key === 'Enter') {
-                    if (verifyInput(input.value)) {
+                    const verify = verifyInput(input.value)
+                    if (verify[0]) {
                         box.removeChild(input)
                         box.classList.remove('active')
                         box.innerHTML = input.value
+
+                        setFunction(verify[0], verify[1], input.value)
+                    } else {
+                        box.classList.add('shake')
+                        setTimeout(() => { box.classList.remove('shake')}, 500)
                     }
                 }
 
@@ -96,6 +111,23 @@ var example = (() => {
                 case 'Delete': deleteBox(e); break;
                 case 'f': drawLine(e); break;
                 case 'Backspace': clearSelection(); break;
+            }
+        }
+
+        const setFunction = (_, type, data) => {
+            if (type === 'num') {
+                console.log('num')
+                variables[key].eval = () => {
+                    con.set(variables[key], data)
+                    return value
+                }
+            } else if (type !== 'string') {
+                console.log('symbol')
+                variables[key].eval = () => {
+                    const temp = con.get(variables[key])
+                    console.log(temp)
+                    return temp
+                }
             }
         }
     }
@@ -118,6 +150,7 @@ var example = (() => {
             }
         }
 
+        delete variables[e.target.attributes.key.value]
         area.removeChild(e.target)
     }
 
@@ -140,6 +173,8 @@ var example = (() => {
                 }
             }
 
+            variables[line[0].attributes.key.value].deps.push(variables[line[1].attributes.key.value])
+
             const temp = new LeaderLine(line[0], line[1], { hide: true })
             temp['show']('draw')
             temp.show()
@@ -160,21 +195,19 @@ var example = (() => {
     }
 
     const verifyInput = input => {
-        const key = Date.now()
-
         let val = parseInt(input)
 
-        if (val !== 'NaN') {
-            return true
+        if (!isNaN(val)) {
+            return [ true, 'num' ]
         } else {
             switch (input) {
-                case '+': return true;
-                case '-': return true;
-                case '/': return true;
-                case '*': return true;
-                case '^': return true;
-                case 'sqrt':  console.log('lol'); return true; 
-                default: return false;
+                case '+': return [ true,  ];
+                case '-': return [ true, 'symbol' ];
+                case '/': return [ true, 'symbol' ];
+                case '*': return [ true, 'symbol' ];
+                case '^': return [ true, 'symbol' ];
+                case 'sqrt': return [ true, 'symbol' ]; 
+                default: return [ false, 'string' ];
             }
         }
     }
