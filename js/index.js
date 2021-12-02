@@ -119,7 +119,7 @@ var example = (() => {
                 console.log('num')
                 variables[key].eval = () => {
                     con.set(variables[key], data)
-                    return value
+                    return variables[key].value
                 }
             } else if (type !== 'string') {
                 console.log('symbol')
@@ -211,4 +211,6 @@ var example = (() => {
             }
         }
     }
+
+    return {variables:variables}
 })()
