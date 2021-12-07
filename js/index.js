@@ -2,6 +2,7 @@ var example = (() => {
     const con = constraints
     const area = document.querySelector('#constraints-area')
     let variables = {}
+    let formulas = {}
 
     area.onmousedown = e => {
         const rect = e.currentTarget.getBoundingClientRect()
@@ -41,8 +42,6 @@ var example = (() => {
                 }
             }
         }})
-
-        variables[key] = con.create()
         
         box.onmouseover = e => {
             e.target.focus()
@@ -116,18 +115,10 @@ var example = (() => {
 
         const setFunction = (_, type, data) => {
             if (type === 'num') {
-                console.log('num')
-                variables[key].eval = () => {
-                    con.set(variables[key], data)
-                    return variables[key].value
-                }
+                variables[key] = con.create()
+                con.set(variables[key], () => { return parseInt(data) })
             } else if (type !== 'string') {
                 console.log('symbol')
-                variables[key].eval = () => {
-                    const temp = con.get(variables[key])
-                    console.log(temp)
-                    return temp
-                }
             }
         }
     }
@@ -173,7 +164,17 @@ var example = (() => {
                 }
             }
 
-            variables[line[0].attributes.key.value].deps.push(variables[line[1].attributes.key.value])
+            //variables[line[0].attributes.key.value].deps.push(variables[line[1].attributes.key.value])
+            const result = verifyInput(line[1].innerHTML)
+            const key0 = line[0].attributes.key.value
+            const key1 = line[1].attributes.key.value
+            console.log(result)
+            if (result[1] === 'symbol') {
+                formulas[key1] = {
+                    symbol: line[1].innerHTML,
+                    prim: formulas[key1] ? [...formulas[key1].prim, variables[key0].eval()] : [variables[key0].eval()]
+                }
+            }
 
             const temp = new LeaderLine(line[0], line[1], { hide: true })
             temp['show']('draw')
@@ -201,16 +202,17 @@ var example = (() => {
             return [ true, 'num' ]
         } else {
             switch (input) {
-                case '+': return [ true,  ];
-                case '-': return [ true, 'symbol' ];
-                case '/': return [ true, 'symbol' ];
-                case '*': return [ true, 'symbol' ];
-                case '^': return [ true, 'symbol' ];
-                case 'sqrt': return [ true, 'symbol' ]; 
-                default: return [ false, 'string' ];
+                case '+': return [ true,  ]
+                case '-': return [ true, 'symbol' ]
+                case '/': return [ true, 'symbol' ]
+                case '*': return [ true, 'symbol' ]
+                case '^': return [ true, 'symbol' ]
+                case 'sqrt': return [ true, 'symbol' ]
+                case ' ': return [ true, 'variable' ]
+                default: return [ false, 'string' ]
             }
         }
     }
 
-    return {variables:variables}
+    return {v:variables, f: formulas}
 })()

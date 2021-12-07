@@ -14,8 +14,8 @@ var constraints = (() => {
         return v.value
     }
 
-    const set = (v, val) => {
-        v.value = val
+    const set = (v, fn) => {
+        v.eval = fn
         for (let dep of v.deps) {
             if (dep.valid)
                 invalidate(dep)
@@ -37,9 +37,7 @@ var constraints = (() => {
             value: null,
             valid: false,
             deps: [],
-            eval: () => {
-                return value
-            }
+            eval: () => ""
         }
     }
 
