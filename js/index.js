@@ -115,10 +115,11 @@ var example = (() => {
 
         const setFunction = (_, type, data) => {
             if (type === 'num') {
-                variables[key] = con.create()
-                con.set(variables[key], () => { return parseInt(data) })
-            } else if (type !== 'string') {
-                console.log('symbol')
+                variables[key] ? null : variables[key] = con.create()
+                variables[key].value = parseInt(data)
+                con.set(variables[key], () => { return variables[key].value })
+            } else if (type === 'variable') {
+                
             }
         }
     }
@@ -172,7 +173,7 @@ var example = (() => {
             if (result[1] === 'symbol') {
                 formulas[key1] = {
                     symbol: line[1].innerHTML,
-                    prim: formulas[key1] ? [...formulas[key1].prim, variables[key0].eval()] : [variables[key0].eval()]
+                    prim: formulas[key1] ? [...formulas[key1].prim, variables[key0].eval] : [variables[key0].eval]
                 }
             }
 
