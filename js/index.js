@@ -115,12 +115,16 @@ var example = (() => {
 
         const setFunction = (_, type, data) => {
             if (type === 'num') {
-                variables[key] ? null : variables[key] = con.create()
+                if (!variables[key])
+                    variables[key] = con.create()
+
                 variables[key].value = parseInt(data)
                 con.set(variables[key], () => { return variables[key].value })
-            } else if (type === 'variable') {
-                
+            } else if (type === 'symbol' && formulas[key]) {
+                createFormula(null, key, box, true)
             }
+
+            updateV()
         }
     }
 
@@ -166,15 +170,22 @@ var example = (() => {
             }
 
             //variables[line[0].attributes.key.value].deps.push(variables[line[1].attributes.key.value])
-            const result = verifyInput(line[1].innerHTML)
+            const result0 = verifyInput(line[0].innerHTML)
+            const result1 = verifyInput(line[1].innerHTML)
             const key0 = line[0].attributes.key.value
             const key1 = line[1].attributes.key.value
-            console.log(result)
-            if (result[1] === 'symbol') {
-                formulas[key1] = {
-                    symbol: line[1].innerHTML,
-                    prim: formulas[key1] ? [...formulas[key1].prim, variables[key0].eval] : [variables[key0].eval]
-                }
+
+            if (result1[1] === 'symbol') {
+                createFormula(key0, key1, line[1])
+            } else if (result0[1] === 'symbol') {
+                variables[key1] = con.create()
+                con.set(variables[key1], formulas[key0].fn)
+
+                Object.keys(formulas[key0].op).map(key => {
+                    variables[key].deps.push(variables[key1])
+                })
+
+                updateV()
             }
 
             const temp = new LeaderLine(line[0], line[1], { hide: true })
@@ -203,16 +214,43 @@ var example = (() => {
             return [ true, 'num' ]
         } else {
             switch (input) {
-                case '+': return [ true,  ]
+                case '+': return [ true, 'symbol' ]
                 case '-': return [ true, 'symbol' ]
                 case '/': return [ true, 'symbol' ]
                 case '*': return [ true, 'symbol' ]
                 case '^': return [ true, 'symbol' ]
-                case 'sqrt': return [ true, 'symbol' ]
-                case ' ': return [ true, 'variable' ]
+                case '': return [ true, 'variable' ]
                 default: return [ false, 'string' ]
             }
         }
+    }
+
+    const updateV = () => {
+        for (const key in variables) {
+            const v = variables[key]
+
+            if (!v.valid) {
+
+                const el = document.querySelector(`.box[key="${ key }"]`)
+                el.innerHTML = con.get(v)
+            }
+        }
+    }
+
+    const createFormula = (key0, key1, box, changeSymbol) => {
+        if (!formulas[key1])
+            formulas[key1] = { symbol: null, fn: null, op: {} }
+        if (!changeSymbol)
+            formulas[key1].op[key0] = variables[key0].eval
+
+        formulas[key1].symbol = box.innerHTML
+
+        formulas[key1].fn = () => {
+            let feval = Object.keys(formulas[key1].op).map(key => { return formulas[key1].op[key]() })
+            return eval(feval.join(formulas[key1].symbol))
+        }
+
+        updateV()
     }
 
     return {v:variables, f: formulas}
