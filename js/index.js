@@ -1,9 +1,15 @@
 var example = (() => {
     const con = constraints
     const area = document.querySelector('#constraints-area')
+
+    //List of constrained variables
     let variables = {}
+
+    //Stores the operands and a symbol to compose a function which evaluates the connected blocks
     let formulas = {}
 
+    //Place a box on the board when clicking on it
+    //Compensates for offsets
     area.onmousedown = e => {
         const rect = e.currentTarget.getBoundingClientRect()
         const x = e.clientX - rect.left
@@ -13,6 +19,7 @@ var example = (() => {
             createBox(x, y)
     }
 
+    //Disable context menu when clicking in the area
     area.oncontextmenu = e => {
         e.preventDefault()
     }
@@ -25,6 +32,13 @@ var example = (() => {
         }
     }
 
+    /**
+     * 
+     * @param {*} x x-coordinate to place the box
+     * @param {*} y y-coordinate to place the box
+     * @description Places the box in a given location and adds various event handlers
+     * to handle dragging, input, and data sanitation
+     */
     const createBox = (x, y) => {
         const key = Date.now()
 
@@ -33,9 +47,12 @@ var example = (() => {
         box.setAttribute('tabindex', '0')
         box.setAttribute('key', key)
         area.appendChild(box)
+
+        //Center box on mouse
         box.style.left = x - box.offsetWidth / 2
         box.style.top = y - box.offsetHeight / 2
 
+        //Create draggable box and ensure lines connecting boxes update position
         const draggable = new PlainDraggable(box, { onMove: () => {
             for (let li of lines) {
                 if (box === li.start || box === li.end) {
@@ -62,10 +79,13 @@ var example = (() => {
 
             //If right click again while editing, cancel edit
             if (box.lastChild && box.lastChild.nodeName === 'INPUT') {
-                console.log(box.childNodes)
-                box.removeChild(box.lastChild)
                 box.classList.remove('active')
-                box.innerHTML = oldVal
+                
+                //Ensure previous value is properly restored on cancel
+                if (oldVal === '<input>')
+                    box.innerHTML = box.lastChild.value
+                else
+                    box.innerHTML = oldVal
 
                 return
             }
@@ -87,15 +107,15 @@ var example = (() => {
                         box.classList.remove('active')
                         box.innerHTML = input.value
 
-                        setFunction(verify[0], verify[1], input.value)
+                        setFunction(verify[1], input.value)
                     } else {
                         box.classList.add('shake')
                         setTimeout(() => { box.classList.remove('shake')}, 500)
                     }
                 }
 
+                //Cancel edit
                 if (e.key === 'Escape') {
-                    box.removeChild(input)
                     box.classList.remove('active')
                     box.innerHTML = oldVal
                 }
@@ -114,8 +134,13 @@ var example = (() => {
             }
         }
 
-        //Set the function associated with a given variable
-        const setFunction = (_, type, data) => {
+        /**
+         * 
+         * @param {String} type Determines what kind of function to create
+         * @param {String} data Input data to determine return value of created funciton
+         * @description Creates an evaluation function for constrained variables
+         */
+        const setFunction = (type, data) => {
             //If box is a primitive, function should return that value
             if (type === 'num') {
                 if (!variables[key])
@@ -125,13 +150,17 @@ var example = (() => {
                 con.set(variables[key], () => { return variables[key].value })
             //If box is a pre-existing formula, update the formula and invalidate deps
             } else if (type === 'symbol' && formulas[key]) {
-                createFormula(null, key, box, true)         
+                createFormula(null, key, true)         
             }
 
             updateV()
         }
     }
 
+    /**
+     * 
+     * @param {Event} e Event
+     */
     const deleteBox = e => {
         const removeLine = li => {
             li.remove()
@@ -160,6 +189,13 @@ var example = (() => {
 
     let lines = [] //Store all the lines on the board
     let line = [] //Temporary variable to store endpoints for new line
+
+    /**
+     * 
+     * @param {Event} e An event of the last selected box
+     * @description Draws a line between two boxes and handles the creation
+     * of dependents and formulas depending on context 
+     */
     const drawLine = e => {
         if (line[0] && line[0] === e.target) {
             clearSelection()
@@ -186,7 +222,7 @@ var example = (() => {
 
             //If we're creating a new formula
             if (result1[1] === 'symbol') {
-                createFormula(key0, key1, line[1])
+                createFormula(key0, key1)
 
             //If we're connecting a formula to an output box, create new variable
             } else if (result0[1] === 'symbol') {
@@ -213,7 +249,9 @@ var example = (() => {
         }
     }
 
-    //Clears the selected boxes for line connection
+    /**
+     * @description Clears the selected boxes for creating a line
+     */
     const clearSelection = () => {
         for (let el of line) {
             el.classList.remove('selected')
@@ -223,7 +261,14 @@ var example = (() => {
         line = []
     }
 
-    //Determines whether a box is a primitive, symbol, variable, or invalid
+    /**
+     * 
+     * @param {String} input String to be parsed
+     * @returns Array; array[0] is a boolean stating whether the result is acceptable
+     * or not and array[1] returns the type of input
+     * @description Determine whether an input is satisfactory and of what type
+     * the input is (symbol, variable, or string)
+     */
     const verifyInput = input => {
         let val = parseInt(input)
 
@@ -235,14 +280,16 @@ var example = (() => {
                 case '-': return [ true, 'symbol' ]
                 case '/': return [ true, 'symbol' ]
                 case '*': return [ true, 'symbol' ]
-                case '^': return [ true, 'symbol' ]
+                case '**': return [ true, 'symbol' ]
                 case '': return [ true, 'variable' ]
                 default: return [ false, 'string' ]
             }
         }
     }
 
-    //Maps over all variables and update invalid values
+    /**
+     * @description Iterates over all variable updating ones marked invalid
+     */
     const updateV = () => {
         for (const key in variables) {
             const v = variables[key]
@@ -255,8 +302,15 @@ var example = (() => {
         }
     }
 
-    //Create formulas when connecting primitive boxes to symbol boxes
-    const createFormula = (key0, key1, box, changeSymbol) => {
+    /**
+     * 
+     * @param {String} key0 Key of the operand box to be added to the formula
+     * @param {String} key1 Key of the operator box to used in the formula
+     * @param {Boolean} changeSymbol True if only the symbol is being changed
+     * @description Builds a formula composed of the operands and symbol and creates a function
+     * before placing it into the formula object
+     */
+    const createFormula = (key0, key1, changeSymbol) => {
         
         //If formula doesn't exist, create it
         if (!formulas[key1])
@@ -266,7 +320,7 @@ var example = (() => {
             formulas[key1].op[key0] = variables[key0].eval
 
         //Get the symbol to be used for the formula
-        formulas[key1].symbol = box.innerHTML
+        formulas[key1].symbol = document.querySelector(`.box[key="${ key1 }"]`).innerHTML
 
         //Map over operands of formula and set them to invalidate upper deps
         formulas[key1].fn = () => {
