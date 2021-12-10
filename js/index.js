@@ -42,6 +42,7 @@ var example = (() => {
     const createBox = (x, y) => {
         const key = Date.now()
 
+        //Create the box element
         let box = document.createElement('div')
         box.classList.add('box');
         box.setAttribute('tabindex', '0')
@@ -162,6 +163,8 @@ var example = (() => {
      * @param {Event} e Event
      */
     const deleteBox = e => {
+        const key = e.target.attributes.key.value
+
         const removeLine = li => {
             li.remove()
             lines = lines.filter(el => { return el !== li })
@@ -180,10 +183,35 @@ var example = (() => {
         }
 
         //Clear deleted box from variables and deps
+        for (const k in variables) {
+            let v = variables[k]
+
+            for (const depk in v.deps) {
+                let dep = v.deps[depk]
+                if (dep === v)
+                    delete v.deps[depk]
+            }
+        }
+        delete variables[key]
 
         //Clear deleted box from formulas
+        for (const k in formulas) {
+            let ops = formulas[k].op
+            let outs = formulas[k].out
 
-        delete variables[e.target.attributes.key.value]
+            for (const opkey in ops) {
+                if (opkey === key)
+                    delete ops[opkey]
+            }
+
+            for (const outkey in outs) {
+                if (outkey === key)
+                    delete outs[outkey]
+            }
+        }
+        delete formulas[key]
+
+        updateV()
         area.removeChild(e.target)
     }
 
@@ -223,15 +251,15 @@ var example = (() => {
             //If we're creating a new formula
             if (result1[1] === 'symbol') {
                 createFormula(key0, key1)
-
             //If we're connecting a formula to an output box, create new variable
             } else if (result0[1] === 'symbol') {
                 variables[key1] = con.create()
-
+                formulas[key0].out[key1] = variables[key1]
+                
                 //Set new variable eval function to formula function
                 con.set(variables[key1], formulas[key0].fn)
 
-                //Push dependencies (formula operands) to variable
+                //Push dependents (formula operands) to variable
                 Object.keys(formulas[key0].op).map(key => {
                     variables[key].deps.push(variables[key1])
                 })
@@ -288,7 +316,7 @@ var example = (() => {
     }
 
     /**
-     * @description Iterates over all variable updating ones marked invalid
+     * @description Iterates over all variable updating ones marked invalid.
      */
     const updateV = () => {
         for (const key in variables) {
@@ -297,7 +325,17 @@ var example = (() => {
             if (!v.valid) {
                 //Select element in DOM and update value
                 const el = document.querySelector(`.box[key="${ key }"]`)
-                el.innerHTML = con.get(v)
+
+                try {
+                    const val = con.get(v)
+                    if (val !== undefined)
+                        el.innerHTML = val
+                    else
+                        el.innerHTML = ''
+                } catch {
+                    delete variables[key]
+                    el.innerHTML = ''
+                }
             }
         }
     }
@@ -311,13 +349,19 @@ var example = (() => {
      * before placing it into the formula object
      */
     const createFormula = (key0, key1, changeSymbol) => {
-        
         //If formula doesn't exist, create it
         if (!formulas[key1])
-            formulas[key1] = { symbol: null, fn: null, op: {} }
+            formulas[key1] = { symbol: null, fn: null, op: {}, out: {} }
         //If formula is only changing operand value, update operand eval fn
-        if (!changeSymbol)
+        if (!changeSymbol) {
             formulas[key1].op[key0] = variables[key0].eval
+
+            //Update dependent list 
+            for (const okey in formulas[key1].out) {
+                variables[key0].deps.push(formulas[key1].out[okey])
+                con.set(variables[key0], variables[key0].eval)
+            }
+        }
 
         //Get the symbol to be used for the formula
         formulas[key1].symbol = document.querySelector(`.box[key="${ key1 }"]`).innerHTML
