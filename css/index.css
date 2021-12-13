@@ -61,11 +61,6 @@ a:hover {
     transition: filter .2s, box-shadow .2s, background-color .2s;
 }
 
-.box input {
-    display: block;
-    width: 100%;
-}
-
 .box.number {
     background-color: var(--number);
 }
