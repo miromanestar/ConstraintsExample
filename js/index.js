@@ -251,9 +251,12 @@ var example = (() => {
                 return
             }
 
-            //If we're creating a new formula
+            let lineLabel = ''
+
+            //If we're creating a new formula or adding to an old one
             if (result1.type === 'symbol') {
                 createFormula(key0, key1)
+                lineLabel = Object.keys(formulas[key1].op).length
             //If we're connecting a formula to an output box, create new variable
             } else if (result0.type === 'symbol') {
                 variables[key1] = new Constraint()
@@ -271,7 +274,8 @@ var example = (() => {
                 update()
             }
 
-            const newLine = new LeaderLine(line[0], line[1], { hide: true })
+            const newLine = new LeaderLine(line[0], line[1], { hide: true, middleLabel: LeaderLine.pathLabel(`${lineLabel}`)  })
+            console.log(newLine)
             newLine['show']('draw') //Change line creation animation to draw instead of fade
             newLine.show() //Show lines
             lines.push(newLine)
