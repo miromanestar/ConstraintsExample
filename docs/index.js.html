@@ -26,7 +26,12 @@
     
     <section>
         <article>
-            <pre class="prettyprint source linenums"><code>var example = (() => {
+            <pre class="prettyprint source linenums"><code>/**
+ * Primary class for management of the user interactive view.
+ * Self-invoking function added to avoid namespace pollution.
+ * @namespace Main
+ */
+var main = (() => {
     const area = document.querySelector('#constraints-area')
 
     //List of constrained variables
@@ -61,10 +66,11 @@
 
     /**
      * 
-     * @param {*} x x-coordinate to place the box
-     * @param {*} y y-coordinate to place the box
+     * @param {Float} x x-coordinate to place the box
+     * @param {Float} y y-coordinate to place the box
      * @description Places the box in a given location and adds various event handlers
      * to handle dragging, input, and data sanitation
+     * @memberOf Main
      */
     const createBox = (x, y) => {
         const key = Date.now()
@@ -72,9 +78,12 @@
         //Create the box element
         let box = document.createElement('div')
         box.classList.add('box');
+        box.classList.add('popin')
         box.setAttribute('tabindex', '0')
         box.setAttribute('key', key)
         area.appendChild(box)
+
+        setTimeout(() => box.classList.remove('popin'), 250)
 
         //Center box on mouse
         box.style.left = x - box.offsetWidth / 2
@@ -102,6 +111,9 @@
             e.preventDefault()
             e.stopPropagation()
             
+            if (box.classList.contains('variable')) {
+                return
+            }
             //Save original value if box edit is canceled
             let oldVal = box.innerHTML
 
@@ -130,14 +142,33 @@
                 
                 if (e.key === 'Enter') {
                     const verify = verifyInput(input.value)
-                    if (verify.result) {
+                    if (verify.result &amp;&amp; 
+                        !(verify.type === 'symbol' &amp;&amp; variables[key] || 
+                        verify.type === 'number' &amp;&amp; verifyInput(oldVal).type === 'symbol')) {
+                        
                         box.removeChild(input)
                         box.classList.remove('active')
                         box.innerHTML = input.value
-                        setFunction(verify.type, input.value)
+                        
+                        box.classList.add(verify.type)
+
+                        setFunction(verify.type, input.value, box)
                     } else {
+                        //All this is to stop shake from overriding the transform property set by draggable
+                        const oldLeft = box.style.left
+                        const oldTop = box.style.top
+                        const translates = box.style.transform.match(/-?\d+/g)
+                        if (translates) {
+                            box.style.left = parseInt(box.style.left) + parseInt(translates[0])
+                            box.style.top = parseInt(box.style.top) + parseInt(translates[1])
+                        }
+
                         box.classList.add('shake')
-                        setTimeout(() => { box.classList.remove('shake')}, 500)
+                        setTimeout(() => { 
+                            box.style.left = oldLeft
+                            box.style.top = oldTop
+                            box.classList.remove('shake')
+                        }, 500)
                     }
                 }
 
@@ -166,6 +197,7 @@
          * @param {String} type Determines what kind of function to create
          * @param {String} data Input data to determine return value of created function
          * @description Creates an evaluation function for constrained variables
+         * @memberOf Main
          */
         const setFunction = (type, data) => {
             //If box is a primitive, function should return that value
@@ -174,7 +206,7 @@
                     variables[key] = new Constraint()
 
                 variables[key].type = 'number'
-                variables[key].value = parseInt(data)
+                variables[key].value = parseFloat(data)
                 variables[key].set(() => { return variables[key].value })
             //If box is a pre-existing formula, update the formula and invalidate deps
             } else if (type === 'symbol' &amp;&amp; formulas[key]) {
@@ -186,8 +218,9 @@
     }
 
     /**
-     * 
-     * @param {Event} e Event
+     * Deletes a box and its accompanying lines, dependents, and formulas
+     * @param {Event} e Event which triggered the calling of this function
+     * @memberOf Main
      */
     const deleteBox = e => {
         const key = e.target.attributes.key.value
@@ -199,19 +232,21 @@
 
         //Finds line value which is being removed 
         let lineVal = 0
+        let end = {}
         for (let li of lines) {
             if (li.start === e.target) {
                 lineVal = li.value
+                end = li.end
             }
         }
 
         for (let li of lines) {
             //Deincrements and updates line labels
             const lineKey = li.end.attributes.key.value
-            if (formulas[lineKey]) {
+            if (end === li.end) {
                 if (li.value > lineVal) {
                     li.value--
-                    li.middleLabel = LeaderLine.pathLabel(`${li.value}`)
+                    li.middleLabel = LeaderLine.pathLabel(`${li.value}`, { outlineColor: '#1D3557'})
                 }
             }
 
@@ -256,7 +291,13 @@
         delete formulas[key]
 
         update()
-        area.removeChild(e.target)
+        
+        const translates = e.target.style.transform.match(/-?\d+/g)
+        e.target.style.left = parseInt(e.target.style.left) + parseInt(translates[0])
+        e.target.style.top = parseInt(e.target.style.top) + parseInt(translates[1])
+
+        e.target.classList.add('remove')
+        setTimeout(() => area.removeChild(e.target), 200)
     }
 
     let lines = [] //Store all the lines on the board
@@ -265,8 +306,9 @@
     /**
      * 
      * @param {Event} e An event of the last selected box
-     * @description Draws a line between two boxes and handles the creation
-     * of dependents and formulas depending on context 
+     * @description Draws a line between two boxes if valid and handles the creation
+     * of dependents and formulas depending on context
+     * @memberOf Main
      */
     const drawLine = e => {
         if (line[0] &amp;&amp; line[0] === e.target) {
@@ -285,14 +327,10 @@
             const result1 = verifyInput(line[1].innerHTML)
             const key0 = line[0].attributes.key.value
             const key1 = line[1].attributes.key.value
-            
-            //Stop boxes which shouldn't connect to each other from connecting
-            if ((result0.type === result1.type ) ||
-                (result0.type !== 'symbol' &amp;&amp; result1.type !== 'symbol') ||
-                (variables[key1] &amp;&amp; variables[key1].type === 'number' ||
-                (result0.type === 'symbol' &amp;&amp; variables[key1] &amp;&amp; variables[key1].type === 'variable')) ||
-                (result0.type === 'variable' &amp;&amp; result1.type === 'symbol')
-            ) {
+
+            if ((result0.type === result1.type) || result0.type === 'variable' ||
+                result0.type === 'number' &amp;&amp; result1.type !== 'symbol' ||
+                result0.type === 'symbol' &amp;&amp; variables[key0] &amp;&amp; variables[key0].type === 'number') {
                 clearSelection()
                 return
             }
@@ -305,6 +343,9 @@
                 lineLabel = Object.keys(formulas[key1].op).length
             //If we're connecting a formula to an output box, create new variable
             } else if (result0.type === 'symbol') {
+                line[1].classList.add('variable')
+
+                line[0].classList.add('symbol')
                 variables[key1] = new Constraint()
                 variables[key1].type = 'variable'
                 formulas[key0].out[key1] = variables[key1]
@@ -320,7 +361,7 @@
                 update()
             }
 
-            const newLine = new LeaderLine(line[0], line[1], { hide: true, middleLabel: LeaderLine.pathLabel(`${lineLabel}`)  })
+            const newLine = new LeaderLine(line[0], line[1], { hide: true, middleLabel: LeaderLine.pathLabel(`${lineLabel}`, {outlineColor: '#1D3557' })  })
             newLine.value = lineLabel
             newLine['show']('draw') //Change line creation animation to draw instead of fade
             newLine.show() //Show lines
@@ -333,6 +374,7 @@
 
     /**
      * @description Clears the selected boxes for creating a line
+     * @memberOf Main
      */
     const clearSelection = () => {
         for (let el of line) {
@@ -346,15 +388,15 @@
     /**
      * 
      * @param {String} input String to be parsed
-     * @returns Array; array[0] is a boolean stating whether the result is acceptable
-     * or not and array[1] returns the type of input
+     * @returns {Object} { result: Bool, type: String }
      * @description Determine whether an input is satisfactory and of what type
      * the input is (symbol, variable, or string)
+     * @memberOf Main
      */
     const verifyInput = input => {
-        let val = parseInt(input)
+        let isNum = /^[+-]?(\d*\.)?\d+$/.test(input)
 
-        if (!isNaN(val)) {
+        if (isNum) {
             return {result: true, type: 'number'}
         } else {
             switch (input) {
@@ -376,6 +418,7 @@
      * @param {Boolean} changeSymbol True if only the symbol is being changed
      * @description Builds a formula composed of the operands and symbol and creates a function
      * before placing it into the formula object
+     * @memberOf Main
      */
     const createFormula = (key0, key1, changeSymbol) => {
         //If formula doesn't exist, create it
@@ -404,14 +447,15 @@
             })
 
             //Transform string into a function
-            return Function('return ' + feval.join(formulas[key1].symbol))()
+            return Function('return ' + feval.join(` ${ formulas[key1].symbol } `))()
         }
 
         update()
     }
 
     /**
-     * @description Iterates over all variable updating ones marked invalid.
+     * @description Iterates over all variables updating ones marked invalid and handles variable DOM updates
+     * @memberOf Main
      */
     const update = () => {
         for (const key in variables) {
@@ -445,13 +489,13 @@
 </div>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="Constraint.html">Constraint</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Namespaces</h3><ul><li><a href="Main.html">Main</a></li></ul><h3>Classes</h3><ul><li><a href="Constraint.html">Constraint</a></li></ul>
 </nav>
 
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 3.6.7</a> on Mon Dec 13 2021 12:29:15 GMT-0500 (Eastern Standard Time)
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 3.6.7</a> on Mon Dec 13 2021 16:50:44 GMT-0500 (Eastern Standard Time)
 </footer>
 
 <script> prettyPrint(); </script>

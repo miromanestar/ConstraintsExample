@@ -1,4 +1,9 @@
-var example = (() => {
+/**
+ * Primary class for management of the user interactive view.
+ * Self-invoking function added to avoid namespace pollution.
+ * @namespace Main
+ */
+var main = (() => {
     const area = document.querySelector('#constraints-area')
 
     //List of constrained variables
@@ -33,10 +38,11 @@ var example = (() => {
 
     /**
      * 
-     * @param {*} x x-coordinate to place the box
-     * @param {*} y y-coordinate to place the box
+     * @param {Float} x x-coordinate to place the box
+     * @param {Float} y y-coordinate to place the box
      * @description Places the box in a given location and adds various event handlers
      * to handle dragging, input, and data sanitation
+     * @memberOf Main
      */
     const createBox = (x, y) => {
         const key = Date.now()
@@ -120,6 +126,9 @@ var example = (() => {
 
                         setFunction(verify.type, input.value, box)
                     } else {
+                        //All this is to stop shake from overriding the transform property set by draggable
+                        const oldLeft = box.style.left
+                        const oldTop = box.style.top
                         const translates = box.style.transform.match(/-?\d+/g)
                         if (translates) {
                             box.style.left = parseInt(box.style.left) + parseInt(translates[0])
@@ -128,8 +137,9 @@ var example = (() => {
 
                         box.classList.add('shake')
                         setTimeout(() => { 
+                            box.style.left = oldLeft
+                            box.style.top = oldTop
                             box.classList.remove('shake')
-                            box.style.transform = ''
                         }, 500)
                     }
                 }
@@ -159,6 +169,7 @@ var example = (() => {
          * @param {String} type Determines what kind of function to create
          * @param {String} data Input data to determine return value of created function
          * @description Creates an evaluation function for constrained variables
+         * @memberOf Main
          */
         const setFunction = (type, data) => {
             //If box is a primitive, function should return that value
@@ -167,7 +178,7 @@ var example = (() => {
                     variables[key] = new Constraint()
 
                 variables[key].type = 'number'
-                variables[key].value = parseInt(data)
+                variables[key].value = parseFloat(data)
                 variables[key].set(() => { return variables[key].value })
             //If box is a pre-existing formula, update the formula and invalidate deps
             } else if (type === 'symbol' && formulas[key]) {
@@ -179,8 +190,9 @@ var example = (() => {
     }
 
     /**
-     * 
-     * @param {Event} e Event
+     * Deletes a box and its accompanying lines, dependents, and formulas
+     * @param {Event} e Event which triggered the calling of this function
+     * @memberOf Main
      */
     const deleteBox = e => {
         const key = e.target.attributes.key.value
@@ -266,8 +278,9 @@ var example = (() => {
     /**
      * 
      * @param {Event} e An event of the last selected box
-     * @description Draws a line between two boxes and handles the creation
-     * of dependents and formulas depending on context 
+     * @description Draws a line between two boxes if valid and handles the creation
+     * of dependents and formulas depending on context
+     * @memberOf Main
      */
     const drawLine = e => {
         if (line[0] && line[0] === e.target) {
@@ -333,6 +346,7 @@ var example = (() => {
 
     /**
      * @description Clears the selected boxes for creating a line
+     * @memberOf Main
      */
     const clearSelection = () => {
         for (let el of line) {
@@ -346,13 +360,13 @@ var example = (() => {
     /**
      * 
      * @param {String} input String to be parsed
-     * @returns Array; array[0] is a boolean stating whether the result is acceptable
-     * or not and array[1] returns the type of input
+     * @returns {Object} { result: Bool, type: String }
      * @description Determine whether an input is satisfactory and of what type
      * the input is (symbol, variable, or string)
+     * @memberOf Main
      */
     const verifyInput = input => {
-        let isNum = /^\d+$/.test(input)
+        let isNum = /^[+-]?(\d*\.)?\d+$/.test(input)
 
         if (isNum) {
             return {result: true, type: 'number'}
@@ -376,6 +390,7 @@ var example = (() => {
      * @param {Boolean} changeSymbol True if only the symbol is being changed
      * @description Builds a formula composed of the operands and symbol and creates a function
      * before placing it into the formula object
+     * @memberOf Main
      */
     const createFormula = (key0, key1, changeSymbol) => {
         //If formula doesn't exist, create it
@@ -411,7 +426,8 @@ var example = (() => {
     }
 
     /**
-     * @description Iterates over all variable updating ones marked invalid.
+     * @description Iterates over all variables updating ones marked invalid and handles variable DOM updates
+     * @memberOf Main
      */
     const update = () => {
         for (const key in variables) {
