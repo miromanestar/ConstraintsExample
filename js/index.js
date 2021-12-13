@@ -169,7 +169,24 @@ var example = (() => {
             lines = lines.filter(el => { return el !== li })
         }
 
+        //Finds line value which is being removed 
+        let lineVal = 0
         for (let li of lines) {
+            if (li.start === e.target) {
+                lineVal = li.value
+            }
+        }
+
+        for (let li of lines) {
+            //Deincrements and updates line labels
+            const lineKey = li.end.attributes.key.value
+            if (formulas[lineKey]) {
+                if (li.value > lineVal) {
+                    li.value--
+                    li.middleLabel = LeaderLine.pathLabel(`${li.value}`)
+                }
+            }
+
             if (e.target === li.start || e.target === li.end) {
                 if (e.target === li.end) {
                     li.hide()
@@ -245,7 +262,8 @@ var example = (() => {
             if ((result0.type === result1.type ) ||
                 (result0.type !== 'symbol' && result1.type !== 'symbol') ||
                 (variables[key1] && variables[key1].type === 'number' ||
-                (result0.type === 'symbol' && variables[key1] && variables[key1].type === 'variable'))
+                (result0.type === 'symbol' && variables[key1] && variables[key1].type === 'variable')) ||
+                (result0.type === 'variable' && result1.type === 'symbol')
             ) {
                 clearSelection()
                 return
@@ -275,7 +293,7 @@ var example = (() => {
             }
 
             const newLine = new LeaderLine(line[0], line[1], { hide: true, middleLabel: LeaderLine.pathLabel(`${lineLabel}`)  })
-            console.log(newLine)
+            newLine.value = lineLabel
             newLine['show']('draw') //Change line creation animation to draw instead of fade
             newLine.show() //Show lines
             lines.push(newLine)
