@@ -1,7 +1,7 @@
 :root {
     --background: #1D3557;
     --secondary: #457B9D;
-    --box: #0a9396;
+    --box: #457B9D; /*#0a9396;*/
     --number: #E63946;
     --symbol: #A8DADC;
     --variable: #FCA311;
