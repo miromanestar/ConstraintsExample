@@ -27,7 +27,6 @@
     <section>
         <article>
             <pre class="prettyprint source linenums"><code>var example = (() => {
-    const con = constraints
     const area = document.querySelector('#constraints-area')
 
     //List of constrained variables
@@ -131,12 +130,11 @@
                 
                 if (e.key === 'Enter') {
                     const verify = verifyInput(input.value)
-                    if (verify[0]) {
+                    if (verify.result) {
                         box.removeChild(input)
                         box.classList.remove('active')
                         box.innerHTML = input.value
-
-                        setFunction(verify[1], input.value)
+                        setFunction(verify.type, input.value)
                     } else {
                         box.classList.add('shake')
                         setTimeout(() => { box.classList.remove('shake')}, 500)
@@ -171,18 +169,19 @@
          */
         const setFunction = (type, data) => {
             //If box is a primitive, function should return that value
-            if (type === 'num') {
+            if (type === 'number') {
                 if (!variables[key])
-                    variables[key] = con.create()
+                    variables[key] = new Constraint()
 
+                variables[key].type = 'number'
                 variables[key].value = parseInt(data)
-                con.set(variables[key], () => { return variables[key].value })
+                variables[key].set(() => { return variables[key].value })
             //If box is a pre-existing formula, update the formula and invalidate deps
             } else if (type === 'symbol' &amp;&amp; formulas[key]) {
                 createFormula(null, key, true)         
             }
 
-            updateV()
+            update()
         }
     }
 
@@ -198,7 +197,24 @@
             lines = lines.filter(el => { return el !== li })
         }
 
+        //Finds line value which is being removed 
+        let lineVal = 0
         for (let li of lines) {
+            if (li.start === e.target) {
+                lineVal = li.value
+            }
+        }
+
+        for (let li of lines) {
+            //Deincrements and updates line labels
+            const lineKey = li.end.attributes.key.value
+            if (formulas[lineKey]) {
+                if (li.value > lineVal) {
+                    li.value--
+                    li.middleLabel = LeaderLine.pathLabel(`${li.value}`)
+                }
+            }
+
             if (e.target === li.start || e.target === li.end) {
                 if (e.target === li.end) {
                     li.hide()
@@ -239,7 +255,7 @@
         }
         delete formulas[key]
 
-        updateV()
+        update()
         area.removeChild(e.target)
     }
 
@@ -263,39 +279,49 @@
 
         //If two boxes have been selected, check to ensure you're not creating a circular dependency
         if (line.length === 2) {
-            for (let li of lines) {
-                if ( (line[0] === li.end &amp;&amp; line[1] === li.start) || (line[0] === li.start &amp;&amp; line[1] === li.end) ) {
-                    clearSelection()
-                    return
-                }
-            }
 
             //Determine the purpose of the first and second boxes, get their corresponding keys
             const result0 = verifyInput(line[0].innerHTML)
             const result1 = verifyInput(line[1].innerHTML)
             const key0 = line[0].attributes.key.value
             const key1 = line[1].attributes.key.value
+            
+            //Stop boxes which shouldn't connect to each other from connecting
+            if ((result0.type === result1.type ) ||
+                (result0.type !== 'symbol' &amp;&amp; result1.type !== 'symbol') ||
+                (variables[key1] &amp;&amp; variables[key1].type === 'number' ||
+                (result0.type === 'symbol' &amp;&amp; variables[key1] &amp;&amp; variables[key1].type === 'variable')) ||
+                (result0.type === 'variable' &amp;&amp; result1.type === 'symbol')
+            ) {
+                clearSelection()
+                return
+            }
 
-            //If we're creating a new formula
-            if (result1[1] === 'symbol') {
+            let lineLabel = ''
+
+            //If we're creating a new formula or adding to an old one
+            if (result1.type === 'symbol') {
                 createFormula(key0, key1)
+                lineLabel = Object.keys(formulas[key1].op).length
             //If we're connecting a formula to an output box, create new variable
-            } else if (result0[1] === 'symbol') {
-                variables[key1] = con.create()
+            } else if (result0.type === 'symbol') {
+                variables[key1] = new Constraint()
+                variables[key1].type = 'variable'
                 formulas[key0].out[key1] = variables[key1]
                 
                 //Set new variable eval function to formula function
-                con.set(variables[key1], formulas[key0].fn)
+                variables[key1].set(formulas[key0].fn)
 
                 //Push dependents (formula operands) to variable
                 Object.keys(formulas[key0].op).map(key => {
                     variables[key].deps.push(variables[key1])
                 })
 
-                updateV()
+                update()
             }
 
-            const newLine = new LeaderLine(line[0], line[1], { hide: true })
+            const newLine = new LeaderLine(line[0], line[1], { hide: true, middleLabel: LeaderLine.pathLabel(`${lineLabel}`)  })
+            newLine.value = lineLabel
             newLine['show']('draw') //Change line creation animation to draw instead of fade
             newLine.show() //Show lines
             lines.push(newLine)
@@ -329,41 +355,16 @@
         let val = parseInt(input)
 
         if (!isNaN(val)) {
-            return [ true, 'num' ]
+            return {result: true, type: 'number'}
         } else {
             switch (input) {
-                case '+': return [ true, 'symbol' ]
-                case '-': return [ true, 'symbol' ]
-                case '/': return [ true, 'symbol' ]
-                case '*': return [ true, 'symbol' ]
-                case '**': return [ true, 'symbol' ]
-                case '': return [ true, 'variable' ]
-                default: return [ false, 'string' ]
-            }
-        }
-    }
-
-    /**
-     * @description Iterates over all variable updating ones marked invalid.
-     */
-    const updateV = () => {
-        for (const key in variables) {
-            const v = variables[key]
-
-            if (!v.valid) {
-                //Select element in DOM and update value
-                const el = document.querySelector(`.box[key="${ key }"]`)
-
-                try {
-                    const val = con.get(v)
-                    if (val !== undefined)
-                        el.innerHTML = val
-                    else
-                        el.innerHTML = ''
-                } catch {
-                    delete variables[key]
-                    el.innerHTML = ''
-                }
+                case '+': return { result: true, type: 'symbol' }
+                case '-': return  { result: true, type: 'symbol' }
+                case '/': return  { result: true, type: 'symbol' }
+                case '*': return  { result: true, type: 'symbol' }
+                case '**': return  { result: true, type: 'symbol' }
+                case '': return  { result: true, type: 'variable' }
+                default: return  { result: false, type: 'string' }
             }
         }
     }
@@ -387,7 +388,7 @@
             //Update dependent list 
             for (const okey in formulas[key1].out) {
                 variables[key0].deps.push(formulas[key1].out[okey])
-                con.set(variables[key0], variables[key0].eval)
+                variables[key0].set(variables[key0].eval)
             }
         }
 
@@ -398,7 +399,7 @@
         formulas[key1].fn = () => {
             //Build formula into a string of operand {symbol} operand {symbol} operand...
             let feval = Object.keys(formulas[key1].op).map(key => {
-                con.set(variables[key], formulas[key1].op[key])
+                variables[key].set(formulas[key1].op[key])
                 return formulas[key1].op[key]() 
             })
 
@@ -406,15 +407,35 @@
             return Function('return ' + feval.join(formulas[key1].symbol))()
         }
 
-        updateV()
+        update()
+    }
+
+    /**
+     * @description Iterates over all variable updating ones marked invalid.
+     */
+    const update = () => {
+        for (const key in variables) {
+            const v = variables[key]
+            if (!v.valid) {
+                //Select element in DOM and update value
+                const el = document.querySelector(`.box[key="${ key }"]`)
+
+                try {
+                    const val = v.get()
+                    if (val !== undefined)
+                        el.innerHTML = val
+                    else
+                        el.innerHTML = ''
+                } catch {
+                    delete variables[key]
+                    el.innerHTML = ''
+                }
+            }
+        }
     }
 
     return {v:variables, f: formulas}
-})()
-
-function help() {
-    console.log('hlp')
-}</code></pre>
+})()</code></pre>
         </article>
     </section>
 
@@ -424,13 +445,13 @@ function help() {
 </div>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2>
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="Constraint.html">Constraint</a></li></ul>
 </nav>
 
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 3.6.7</a> on Sun Dec 12 2021 22:19:01 GMT-0500 (Eastern Standard Time)
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 3.6.7</a> on Mon Dec 13 2021 12:29:15 GMT-0500 (Eastern Standard Time)
 </footer>
 
 <script> prettyPrint(); </script>

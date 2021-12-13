@@ -44,9 +44,12 @@ var example = (() => {
         //Create the box element
         let box = document.createElement('div')
         box.classList.add('box');
+        box.classList.add('popin')
         box.setAttribute('tabindex', '0')
         box.setAttribute('key', key)
         area.appendChild(box)
+
+        setTimeout(() => box.classList.remove('popin'), 250)
 
         //Center box on mouse
         box.style.left = x - box.offsetWidth / 2
@@ -74,6 +77,9 @@ var example = (() => {
             e.preventDefault()
             e.stopPropagation()
             
+            if (box.classList.contains('variable')) {
+                return
+            }
             //Save original value if box edit is canceled
             let oldVal = box.innerHTML
 
@@ -102,14 +108,29 @@ var example = (() => {
                 
                 if (e.key === 'Enter') {
                     const verify = verifyInput(input.value)
-                    if (verify.result) {
+                    if (verify.result && 
+                        !(verify.type === 'symbol' && variables[key] || 
+                        verify.type === 'number' && verifyInput(oldVal).type === 'symbol')) {
+                        
                         box.removeChild(input)
                         box.classList.remove('active')
                         box.innerHTML = input.value
-                        setFunction(verify.type, input.value)
+                        
+                        box.classList.add(verify.type)
+
+                        setFunction(verify.type, input.value, box)
                     } else {
+                        const translates = box.style.transform.match(/-?\d+/g)
+                        if (translates) {
+                            box.style.left = parseInt(box.style.left) + parseInt(translates[0])
+                            box.style.top = parseInt(box.style.top) + parseInt(translates[1])
+                        }
+
                         box.classList.add('shake')
-                        setTimeout(() => { box.classList.remove('shake')}, 500)
+                        setTimeout(() => { 
+                            box.classList.remove('shake')
+                            box.style.transform = ''
+                        }, 500)
                     }
                 }
 
@@ -171,19 +192,21 @@ var example = (() => {
 
         //Finds line value which is being removed 
         let lineVal = 0
+        let end = {}
         for (let li of lines) {
             if (li.start === e.target) {
                 lineVal = li.value
+                end = li.end
             }
         }
 
         for (let li of lines) {
             //Deincrements and updates line labels
             const lineKey = li.end.attributes.key.value
-            if (formulas[lineKey]) {
+            if (end === li.end) {
                 if (li.value > lineVal) {
                     li.value--
-                    li.middleLabel = LeaderLine.pathLabel(`${li.value}`)
+                    li.middleLabel = LeaderLine.pathLabel(`${li.value}`, { outlineColor: '#1D3557'})
                 }
             }
 
@@ -228,7 +251,13 @@ var example = (() => {
         delete formulas[key]
 
         update()
-        area.removeChild(e.target)
+        
+        const translates = e.target.style.transform.match(/-?\d+/g)
+        e.target.style.left = parseInt(e.target.style.left) + parseInt(translates[0])
+        e.target.style.top = parseInt(e.target.style.top) + parseInt(translates[1])
+
+        e.target.classList.add('remove')
+        setTimeout(() => area.removeChild(e.target), 200)
     }
 
     let lines = [] //Store all the lines on the board
@@ -257,14 +286,10 @@ var example = (() => {
             const result1 = verifyInput(line[1].innerHTML)
             const key0 = line[0].attributes.key.value
             const key1 = line[1].attributes.key.value
-            
-            //Stop boxes which shouldn't connect to each other from connecting
-            if ((result0.type === result1.type ) ||
-                (result0.type !== 'symbol' && result1.type !== 'symbol') ||
-                (variables[key1] && variables[key1].type === 'number' ||
-                (result0.type === 'symbol' && variables[key1] && variables[key1].type === 'variable')) ||
-                (result0.type === 'variable' && result1.type === 'symbol')
-            ) {
+
+            if ((result0.type === result1.type) || result0.type === 'variable' ||
+                result0.type === 'number' && result1.type !== 'symbol' ||
+                result0.type === 'symbol' && variables[key0] && variables[key0].type === 'number') {
                 clearSelection()
                 return
             }
@@ -277,6 +302,9 @@ var example = (() => {
                 lineLabel = Object.keys(formulas[key1].op).length
             //If we're connecting a formula to an output box, create new variable
             } else if (result0.type === 'symbol') {
+                line[1].classList.add('variable')
+
+                line[0].classList.add('symbol')
                 variables[key1] = new Constraint()
                 variables[key1].type = 'variable'
                 formulas[key0].out[key1] = variables[key1]
@@ -292,7 +320,7 @@ var example = (() => {
                 update()
             }
 
-            const newLine = new LeaderLine(line[0], line[1], { hide: true, middleLabel: LeaderLine.pathLabel(`${lineLabel}`)  })
+            const newLine = new LeaderLine(line[0], line[1], { hide: true, middleLabel: LeaderLine.pathLabel(`${lineLabel}`, {outlineColor: '#1D3557' })  })
             newLine.value = lineLabel
             newLine['show']('draw') //Change line creation animation to draw instead of fade
             newLine.show() //Show lines
@@ -324,9 +352,9 @@ var example = (() => {
      * the input is (symbol, variable, or string)
      */
     const verifyInput = input => {
-        let val = parseInt(input)
+        let isNum = /^\d+$/.test(input)
 
-        if (!isNaN(val)) {
+        if (isNum) {
             return {result: true, type: 'number'}
         } else {
             switch (input) {
@@ -376,7 +404,7 @@ var example = (() => {
             })
 
             //Transform string into a function
-            return Function('return ' + feval.join(formulas[key1].symbol))()
+            return Function('return ' + feval.join(` ${ formulas[key1].symbol } `))()
         }
 
         update()
