@@ -49,20 +49,6 @@ var constraints = (() => {
         v.deps = []
     }
 
-    const isCircular = v => {
-        
-        const recursive = va => {
-            for (let dep of va.deps) {
-                if (v === dep)
-                    return true
-                recursive(dep)
-            }
-        }
-        const result = recursive(v)
-
-        return Boolean(result)
-    }
-
     /**
      * 
      * @returns Variable object
@@ -80,7 +66,6 @@ var constraints = (() => {
     return {
         get: get,
         set: set,
-        isCircular: isCircular,
         create: create
     }
 })()

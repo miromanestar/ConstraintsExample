@@ -250,7 +250,6 @@ var example = (() => {
 
             //If we're creating a new formula
             if (result1[1] === 'symbol') {
-                console.log(con.isCircular(variables[key0]))
                 createFormula(key0, key1)
             //If we're connecting a formula to an output box, create new variable
             } else if (result0[1] === 'symbol') {
@@ -265,7 +264,6 @@ var example = (() => {
                     variables[key].deps.push(variables[key1])
                 })
 
-                console.log(con.isCircular(variables[key1]))
                 updateV()
             }
 
