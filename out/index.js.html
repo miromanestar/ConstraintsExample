@@ -1,4 +1,33 @@
-var example = (() => {
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: index.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: index.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>var example = (() => {
+    const con = constraints
     const area = document.querySelector('#constraints-area')
 
     //List of constrained variables
@@ -78,11 +107,11 @@ var example = (() => {
             let oldVal = box.innerHTML
 
             //If right click again while editing, cancel edit
-            if (box.lastChild && box.lastChild.nodeName === 'INPUT') {
+            if (box.lastChild &amp;&amp; box.lastChild.nodeName === 'INPUT') {
                 box.classList.remove('active')
                 
                 //Ensure previous value is properly restored on cancel
-                if (oldVal === '<input>')
+                if (oldVal === '&lt;input>')
                     box.innerHTML = box.lastChild.value
                 else
                     box.innerHTML = oldVal
@@ -102,11 +131,12 @@ var example = (() => {
                 
                 if (e.key === 'Enter') {
                     const verify = verifyInput(input.value)
-                    if (verify.result) {
+                    if (verify[0]) {
                         box.removeChild(input)
                         box.classList.remove('active')
                         box.innerHTML = input.value
-                        setFunction(verify.type, input.value)
+
+                        setFunction(verify[1], input.value)
                     } else {
                         box.classList.add('shake')
                         setTimeout(() => { box.classList.remove('shake')}, 500)
@@ -141,19 +171,18 @@ var example = (() => {
          */
         const setFunction = (type, data) => {
             //If box is a primitive, function should return that value
-            if (type === 'number') {
+            if (type === 'num') {
                 if (!variables[key])
-                    variables[key] = new Constraint()
+                    variables[key] = con.create()
 
-                variables[key].type = 'number'
                 variables[key].value = parseInt(data)
-                variables[key].set(() => { return variables[key].value })
+                con.set(variables[key], () => { return variables[key].value })
             //If box is a pre-existing formula, update the formula and invalidate deps
-            } else if (type === 'symbol' && formulas[key]) {
+            } else if (type === 'symbol' &amp;&amp; formulas[key]) {
                 createFormula(null, key, true)         
             }
 
-            update()
+            updateV()
         }
     }
 
@@ -210,7 +239,7 @@ var example = (() => {
         }
         delete formulas[key]
 
-        update()
+        updateV()
         area.removeChild(e.target)
     }
 
@@ -224,7 +253,7 @@ var example = (() => {
      * of dependents and formulas depending on context 
      */
     const drawLine = e => {
-        if (line[0] && line[0] === e.target) {
+        if (line[0] &amp;&amp; line[0] === e.target) {
             clearSelection()
             return
         }
@@ -234,41 +263,36 @@ var example = (() => {
 
         //If two boxes have been selected, check to ensure you're not creating a circular dependency
         if (line.length === 2) {
+            for (let li of lines) {
+                if ( (line[0] === li.end &amp;&amp; line[1] === li.start) || (line[0] === li.start &amp;&amp; line[1] === li.end) ) {
+                    clearSelection()
+                    return
+                }
+            }
 
             //Determine the purpose of the first and second boxes, get their corresponding keys
             const result0 = verifyInput(line[0].innerHTML)
             const result1 = verifyInput(line[1].innerHTML)
             const key0 = line[0].attributes.key.value
             const key1 = line[1].attributes.key.value
-            
-            //Stop boxes which shouldn't connect to each other from connecting
-            if ((result0.type === result1.type ) ||
-                (result0.type !== 'symbol' && result1.type !== 'symbol') ||
-                (variables[key1] && variables[key1].type === 'number' ||
-                (result0.type === 'symbol' && variables[key1] && variables[key1].type === 'variable'))
-            ) {
-                clearSelection()
-                return
-            }
 
             //If we're creating a new formula
-            if (result1.type === 'symbol') {
+            if (result1[1] === 'symbol') {
                 createFormula(key0, key1)
             //If we're connecting a formula to an output box, create new variable
-            } else if (result0.type === 'symbol') {
-                variables[key1] = new Constraint()
-                variables[key1].type = 'variable'
+            } else if (result0[1] === 'symbol') {
+                variables[key1] = con.create()
                 formulas[key0].out[key1] = variables[key1]
                 
                 //Set new variable eval function to formula function
-                variables[key1].set(formulas[key0].fn)
+                con.set(variables[key1], formulas[key0].fn)
 
                 //Push dependents (formula operands) to variable
                 Object.keys(formulas[key0].op).map(key => {
                     variables[key].deps.push(variables[key1])
                 })
 
-                update()
+                updateV()
             }
 
             const newLine = new LeaderLine(line[0], line[1], { hide: true })
@@ -305,16 +329,41 @@ var example = (() => {
         let val = parseInt(input)
 
         if (!isNaN(val)) {
-            return {result: true, type: 'number'}
+            return [ true, 'num' ]
         } else {
             switch (input) {
-                case '+': return { result: true, type: 'symbol' }
-                case '-': return  { result: true, type: 'symbol' }
-                case '/': return  { result: true, type: 'symbol' }
-                case '*': return  { result: true, type: 'symbol' }
-                case '**': return  { result: true, type: 'symbol' }
-                case '': return  { result: true, type: 'variable' }
-                default: return  { result: false, type: 'string' }
+                case '+': return [ true, 'symbol' ]
+                case '-': return [ true, 'symbol' ]
+                case '/': return [ true, 'symbol' ]
+                case '*': return [ true, 'symbol' ]
+                case '**': return [ true, 'symbol' ]
+                case '': return [ true, 'variable' ]
+                default: return [ false, 'string' ]
+            }
+        }
+    }
+
+    /**
+     * @description Iterates over all variable updating ones marked invalid.
+     */
+    const updateV = () => {
+        for (const key in variables) {
+            const v = variables[key]
+
+            if (!v.valid) {
+                //Select element in DOM and update value
+                const el = document.querySelector(`.box[key="${ key }"]`)
+
+                try {
+                    const val = con.get(v)
+                    if (val !== undefined)
+                        el.innerHTML = val
+                    else
+                        el.innerHTML = ''
+                } catch {
+                    delete variables[key]
+                    el.innerHTML = ''
+                }
             }
         }
     }
@@ -338,7 +387,7 @@ var example = (() => {
             //Update dependent list 
             for (const okey in formulas[key1].out) {
                 variables[key0].deps.push(formulas[key1].out[okey])
-                variables[key0].set(variables[key0].eval)
+                con.set(variables[key0], variables[key0].eval)
             }
         }
 
@@ -349,7 +398,7 @@ var example = (() => {
         formulas[key1].fn = () => {
             //Build formula into a string of operand {symbol} operand {symbol} operand...
             let feval = Object.keys(formulas[key1].op).map(key => {
-                variables[key].set(formulas[key1].op[key])
+                con.set(variables[key], formulas[key1].op[key])
                 return formulas[key1].op[key]() 
             })
 
@@ -357,32 +406,34 @@ var example = (() => {
             return Function('return ' + feval.join(formulas[key1].symbol))()
         }
 
-        update()
-    }
-
-    /**
-     * @description Iterates over all variable updating ones marked invalid.
-     */
-    const update = () => {
-        for (const key in variables) {
-            const v = variables[key]
-            if (!v.valid) {
-                //Select element in DOM and update value
-                const el = document.querySelector(`.box[key="${ key }"]`)
-
-                try {
-                    const val = v.get()
-                    if (val !== undefined)
-                        el.innerHTML = val
-                    else
-                        el.innerHTML = ''
-                } catch {
-                    delete variables[key]
-                    el.innerHTML = ''
-                }
-            }
-        }
+        updateV()
     }
 
     return {v:variables, f: formulas}
 })()
+
+function help() {
+    console.log('hlp')
+}</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 3.6.7</a> on Sun Dec 12 2021 22:19:01 GMT-0500 (Eastern Standard Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>
